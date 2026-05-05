@@ -1,0 +1,27 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+
+# Environment variables — never commit these
+.env.local
+.env.*.local
+
+# Local resources and design assets
+resorces/
+
+# Claude Code local memory and settings
+.claude/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor
+.vscode/
+.idea/

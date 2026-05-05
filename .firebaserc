@@ -1,0 +1,15 @@
+{
+  "projects": {
+    "default": "phiprojects-1f1f6"
+  },
+  "targets": {
+    "phiprojects-1f1f6": {
+      "hosting": {
+        "phiprojects": [
+          "phiprojects"
+        ]
+      }
+    }
+  },
+  "etags": {}
+}
