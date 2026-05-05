@@ -10,38 +10,29 @@ Herramienta personal de gestión de proyectos de desarrollo y consultoría. Cent
 
 - **Frontend:** Vue 3 + Vite
 - **Estilos:** Tailwind CSS 4
-- **Backend:** Firebase — Authentication (email/password) + Firestore (base de datos en tiempo real)
+- **Backend:** Firebase — Authentication (email/password) + Firestore
 - **Deploy:** Firebase Hosting
+- **PWA:** Instalable en desktop y mobile
 
 ---
 
 ## Requisitos previos
 
 - Node.js 18+
-- Una cuenta de Firebase con un proyecto creado
 - Firebase CLI: `npm install -g firebase-tools`
 
 ---
 
-## Configuración inicial
-
-### 1. Clonar e instalar
+## Configuración
 
 ```bash
 git clone https://github.com/tu-usuario/phiprojects.git
 cd phiprojects
 npm install
+cp .env.example .env.local   # Rellenar con tus credenciales Firebase
 ```
 
-### 2. Variables de entorno
-
-Copia el archivo de ejemplo y rellena con los datos de tu proyecto Firebase:
-
-```bash
-cp .env.example .env.local
-```
-
-Edita `.env.local` con los valores que encuentras en Firebase Console → Configuración del proyecto → Tus apps:
+### Variables de entorno (`.env.local`)
 
 ```env
 VITE_FIREBASE_API_KEY=...
@@ -52,169 +43,94 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=...
 VITE_FIREBASE_APP_ID=...
 ```
 
-### 3. Configurar Firebase
+### Firebase Console
 
-#### Authentication
-En Firebase Console → Authentication → Sign-in method → habilitar **Email/Password**.
+**Authentication:** Habilitar Email/Password. Crear usuario en Authentication → Users.
 
-Crea tu usuario en Authentication → Users → Agregar usuario.
-
-#### Firestore
-En Firebase Console → Firestore Database → Crear base de datos (modo producción).
-
-Configura las reglas de seguridad en Firestore → Reglas:
-
+**Firestore rules:**
 ```
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /projects/{projectId} {
-      allow read, write: if request.auth != null;
+      allow read, write: if request.auth != null && resource.data.ownerId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
       match /{subcollection}/{docId} {
-        allow read, write: if request.auth != null;
+        allow read, write: if request.auth != null
+          && get(/databases/$(database)/documents/projects/$(projectId)).data.ownerId == request.auth.uid;
       }
     }
-    match /settings/{docId} {
-      allow read, write: if request.auth != null;
+    match /settings/{docId} { allow read, write: if request.auth != null; }
+    match /taskLists/{listId} {
+      allow read, write: if request.auth != null && resource.data.ownerId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
+      match /tasks/{taskId} {
+        allow read, write: if request.auth != null
+          && get(/databases/$(database)/documents/taskLists/$(listId)).data.ownerId == request.auth.uid;
+      }
     }
   }
 }
 ```
 
-### 4. Levantar en desarrollo
+---
+
+## Desarrollo y deploy
 
 ```bash
-npm run dev
+npm run dev                                          # Servidor local
+npm run build && firebase deploy --only hosting:phiprojects  # Deploy
+firebase deploy --only firestore:rules               # Solo reglas
 ```
 
 ---
 
-## Deploy a Firebase Hosting
-
-```bash
-# Conectar al proyecto Firebase
-firebase login
-firebase use tu-project-id
-
-# Construir y desplegar
-npm run build
-firebase deploy --only hosting
-```
-
----
-
-## Manual de uso
+## Funcionalidades
 
 ### Dashboard
+- Tabla de proyectos con ordenamiento por cualquier columna
+- **Búsqueda global** — busca en todos los estados simultáneamente
+- **Filtro por cliente** — clic en un nombre de cliente para ver solo sus proyectos
+- Tabs: Activos / En espera / No aprobado
+- Barra financiera: total cobrado vs pendiente de proyectos activos
+- Export a CSV
+- Indicadores de contenido en cada fila (tareas, notas, archivos)
+- Panel lateral (drawer) con acceso rápido a tareas, notas y archivos sin salir del dashboard
 
-Vista principal con todos los proyectos organizados por estado.
-
-- **Tabs:** Activos / En espera de aprobación / No aprobado
-- **Búsqueda:** Filtra por nombre de proyecto o cliente en tiempo real
-- **Ordenar:** Haz clic en cualquier encabezado de columna (Proyecto, Cliente, Entrega, Días rest., Monto, Prioridad)
-- **Panel lateral:** Haz clic en una fila para abrir el panel rápido con Tareas, Notas y Archivos sin salir del dashboard
-- **Indicadores:** Iconos pequeños junto al nombre muestran si el proyecto tiene tareas, notas o archivos
-- **Barra financiera:** Muestra el total cobrado vs. pendiente de todos los proyectos activos
-
-#### Crear un proyecto
-
-Botón **Nuevo Proyecto** (esquina superior derecha).
-
-Campos disponibles:
-- Título y cliente
-- **Tipo:** Pro Bono (sin cobro) / Personal (propio, sin pago)
-- **Monto:** con opción "Por definir" si el precio aún no está acordado
-- Fechas de inicio y entrega (opcionales si está en espera)
-- Estado, prioridad y tipo de servicio
-- Notas iniciales
-
-> El adelanto no tiene campo propio — se registra como un hito de pago para mayor trazabilidad.
-
-#### Tipos de servicio
-
-Los tipos de servicio se crean desde el formulario de proyecto usando el botón **+** junto al selector. Se guardan en Firestore y están disponibles en todos los proyectos.
-
----
-
-### Detalle de proyecto
-
-Accede haciendo clic en **Ver detalle** desde el panel lateral, o navegando directamente.
-
-#### Finanzas
-Muestra el desglose completo:
-- Monto total acordado
-- Adelanto recibido (si lo registraste como hito)
-- Hitos cobrados
-- Total cobrado y pendiente
-- Barra de progreso de cobro
-
-#### Tareas (Todos)
-Lista de tareas con estado de cumplimiento. El porcentaje de avance se calcula automáticamente.
-
-#### Hitos de pago
-Registra pagos parciales. Dos tipos:
-- **Hito normal:** se contabiliza contra el monto total
-- **Cargo extra:** activa el toggle "Cargo extra" al agregar — suma este monto al total acordado del proyecto
-
-#### Notas
-Editor de texto libre. Se guarda al hacer clic fuera o al cerrar el panel.
-
-#### Documentos
-Adjunta referencias a documentos con nombre, tipo y URL o ruta de archivo local.
-
-Tipos disponibles: Contrato, Propuesta, Referencia, Insumo, Reporte, Anexo, Otro.
-
-#### Estado del proyecto
-
-El flujo de vida de un proyecto es:
-
-```
-En espera → Aprobado (Activo) → [Marcar terminado] → Cerrar proyecto → Archivado
-```
-
-- **Aprobar:** desde el panel lateral cuando el proyecto está en "En espera"
-- **Marcar terminado:** en el tab Tareas del panel lateral — activa el indicador "Pend. cierre" en el dashboard sin cambiar el estado
-- **Cerrar proyecto:** cuando está marcado como terminado, el botón de archivar cambia a "Cerrar proyecto" — lo mueve al archivo y registra la fecha de cierre
-
----
+### Proyectos
+Cada proyecto gestiona:
+- **Identidad:** título, cliente, tipo de servicio (configurable)
+- **Tipo:** Normal / Pro Bono / Personal (φ)
+- **Finanzas:** monto acordado (o "por definir"), hitos de pago con trazabilidad completa, cargos extra que suman al total
+- **Cronograma:** inicio, entrega, indicador de días restantes con colores
+- **Estado:** Activo → Pendiente de cierre → Cerrar proyecto → Archivado
+- **Contenido:** notas editables, todos con edición inline, documentos con soporte de URL y rutas locales
+- **Indicador "Pend. cierre"** — marca el trabajo como terminado sin archivar (pendiente de revisión o pago)
 
 ### Archivo histórico
+- Proyectos cerrados y propuestas no aprobadas
+- Resumen financiero anual (proyectos, facturación, pro bono) usando fecha de cierre real (`closedAt`)
+- Reactivar o eliminar proyectos
 
-Muestra proyectos cerrados y propuestas no aprobadas.
+### Tareas personales
+- Listas independientes de proyectos con colores personalizables
+- Tareas con prioridad (Alta/Media/Baja) y fecha límite
+- Edición inline de tareas
+- Contador de pendientes por lista
+- Indicador de fecha vencida o próxima a vencer
 
-- **Resumen anual:** total de proyectos y monto facturado por año
-- **Reactivar:** devuelve un proyecto al estado Activo
-- **Eliminar:** eliminación permanente con confirmación
+### UX y rendimiento
+- Dark/Light mode con preferencia persistente
+- PWA — instalable en desktop y mobile
+- Diseño responsive: sidebar en desktop, bottom nav en mobile, sidebar compacto en tablet
+- Notificaciones de deadline (cuando la app está instalada como PWA)
+- Caché offline con Firestore `persistentLocalCache`
+- Bundle dividido (Firebase, Vue, iconos en chunks independientes)
+- Toasts de confirmación, modales de confirmación sin `confirm()` nativo
 
 ---
 
-## Estructura del proyecto
-
-```
-src/
-├── firebase/          # Inicialización de Firebase
-├── router/            # Vue Router con guard de autenticación
-├── stores/
-│   ├── auth.js        # Estado de autenticación
-│   ├── projects.js    # CRUD de proyectos y subcollecciones
-│   └── settings.js    # Tipos de servicio (Firestore)
-├── composables/
-│   ├── useToast.js    # Sistema de notificaciones
-│   ├── useConfirm.js  # Modal de confirmación
-│   ├── useTheme.js    # Dark / Light mode
-│   └── useServiceTypes.js
-├── components/
-│   ├── layout/        # Sidebar y AppLayout
-│   ├── ui/            # Badges, Toast, ConfirmModal
-│   └── projects/      # Modal, Drawer, TodoList, Milestones, Docs
-└── views/
-    ├── LoginView.vue
-    ├── DashboardView.vue
-    ├── ProjectDetailView.vue
-    └── ArchiveView.vue
-```
-
-## Modelo de datos en Firestore
+## Modelo de datos
 
 ```
 projects/{projectId}
@@ -222,24 +138,21 @@ projects/{projectId}
   totalAmount, milestonesCollected
   probono, isPersonal, priceUndefined, waitingClose
   startDate, deliveryDate, closedAt
-  notes, todosCount, docsCount
+  notes, todosCount, docsCount, ownerId
   createdAt, updatedAt
 
-  todos/{todoId}
-    text, completed, createdAt
+  todos/{todoId}        — text, completed
+  milestones/{id}       — label, amount, paid, isExtra
+  documents/{id}        — name, type, url
 
-  milestones/{milestoneId}
-    label, amount, paid, isExtra, createdAt
+taskLists/{listId}      — name, color, ownerId, pendingCount
+  tasks/{taskId}        — text, completed, priority, dueDate
 
-  documents/{docId}
-    name, type, url, createdAt
-
-settings/app
-  serviceTypes: [{ value, label }]
+settings/app            — serviceTypes: [{value, label}]
 ```
 
 ---
 
 ## Licencia
 
-Uso personal. No distribuir sin autorización.
+[Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/)

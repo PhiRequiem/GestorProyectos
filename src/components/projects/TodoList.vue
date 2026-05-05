@@ -12,12 +12,22 @@
       <div class="progress-bar" :style="{ width: progressPct + '%' }"></div>
     </div>
 
+    <p v-if="!todos.length" class="empty-state">
+      <ListTodo :size="14" /> Sin tareas aún. Agrega la primera abajo.
+    </p>
+
     <ul class="todo-list">
       <li v-for="todo in todos" :key="todo.id" class="todo-item">
         <button class="check-btn" :class="{ done: todo.completed }" @click="toggle(todo)">
           <Check v-if="todo.completed" :size="11" />
         </button>
-        <span class="todo-text" :class="{ done: todo.completed }">{{ todo.text }}</span>
+        <span
+      class="todo-text"
+      :class="{ done: todo.completed }"
+      :contenteditable="!todo.completed"
+      @blur="e => saveEdit(todo, e)"
+      @keydown.enter.prevent="e => e.target.blur()"
+    >{{ todo.text }}</span>
         <button class="del-btn" @click="remove(todo.id)">
           <X :size="13" />
         </button>
@@ -62,6 +72,15 @@ async function toggle(todo) {
 
 async function remove(id) {
   await store.deleteTodo(props.projectId, id)
+}
+
+async function saveEdit(todo, e) {
+  const newText = e.target.innerText.trim()
+  if (!newText || newText === todo.text) {
+    e.target.innerText = todo.text
+    return
+  }
+  await store.updateTodo(props.projectId, todo.id, newText)
 }
 
 async function addNew() {
@@ -168,11 +187,33 @@ async function addNew() {
   font-size: 0.875rem;
   color: var(--color-text-primary);
   transition: all 0.15s;
+  outline: none;
+  border-radius: 4px;
+  padding: 1px 3px;
+  cursor: text;
+}
+
+.todo-text:not(.done):focus {
+  background: var(--color-bg-elevated);
+  box-shadow: 0 0 0 2px var(--color-brand);
 }
 
 .todo-text.done {
   text-decoration: line-through;
   color: var(--color-text-muted);
+  cursor: default;
+  pointer-events: none;
+}
+
+.empty-state {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+  margin: 0;
+  padding: 4px 0;
 }
 
 .del-btn {

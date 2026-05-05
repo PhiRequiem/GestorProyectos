@@ -24,6 +24,11 @@ const routes = [
         component: () => import('@/views/ProjectDetailView.vue'),
       },
       {
+        path: 'tasks',
+        name: 'Tasks',
+        component: () => import('@/views/TasksView.vue'),
+      },
+      {
         path: 'archive',
         name: 'Archive',
         component: () => import('@/views/ArchiveView.vue'),

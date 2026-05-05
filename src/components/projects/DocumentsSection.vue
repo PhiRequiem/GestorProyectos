@@ -4,6 +4,7 @@
       <h3><FolderOpen :size="16" /> Documentos</h3>
     </div>
 
+    <p v-if="!documents.length" class="empty-hint">Sin documentos. Agrega contratos, propuestas o referencias.</p>
     <ul class="doc-list">
       <li v-for="d in documents" :key="d.id" class="doc-item">
         <div class="doc-icon" :class="d.type">
@@ -17,8 +18,9 @@
         <a v-if="d.url && isWebUrl(d.url)" :href="d.url" target="_blank" class="doc-link" title="Abrir enlace">
           <ExternalLink :size="13" />
         </a>
-        <span v-else-if="d.url" class="doc-path" :title="d.url">
+        <span v-else-if="d.url" class="doc-path-wrap">
           <FolderSymlink :size="13" />
+          <span class="path-tooltip">{{ d.url }}</span>
         </span>
         <button class="del-btn" @click="remove(d.id)"><X :size="13" /></button>
       </li>
@@ -91,6 +93,13 @@ async function addNew() {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.empty-hint {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+  margin: 0;
 }
 
 .section-header h3 {
@@ -183,14 +192,38 @@ async function addNew() {
   color: var(--color-brand-light);
 }
 
-.doc-path {
+.doc-path-wrap {
+  position: relative;
   color: var(--color-text-muted);
   padding: 3px;
   border-radius: 4px;
   display: flex;
   cursor: default;
-  title: attr(title);
 }
+
+.doc-path-wrap:hover { color: var(--color-text-secondary); }
+
+.path-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-light);
+  border-radius: 7px;
+  padding: 6px 10px;
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  z-index: 50;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  pointer-events: none;
+}
+
+.doc-path-wrap:hover .path-tooltip { display: block; }
 
 .del-btn {
   background: transparent;

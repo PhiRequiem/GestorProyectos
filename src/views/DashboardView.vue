@@ -5,10 +5,16 @@
         <h1>{{ greeting }}, {{ firstName }}</h1>
         <p>Aquí está el resumen de tus proyectos activos.</p>
       </div>
-      <button class="btn-new" @click="openNewProject">
-        <Plus :size="16" />
-        Nuevo Proyecto
-      </button>
+      <div class="header-btns">
+        <button class="btn-outline-sm" @click="exportCSV" title="Exportar a CSV">
+          <Download :size="15" />
+          <span class="btn-label">Exportar</span>
+        </button>
+        <button class="btn-new" @click="openNewProject">
+          <Plus :size="16" />
+          Nuevo Proyecto
+        </button>
+      </div>
     </div>
 
     <!-- Stat Cards -->
@@ -88,6 +94,18 @@
         </div>
       </div>
 
+      <div v-if="isClientFilter" class="global-search-banner client-banner">
+        <User :size="13" />
+        Filtrando por cliente: <strong>{{ clientFilter }}</strong>
+        <button @click="clientFilter = ''" class="clear-search">Limpiar <X :size="11" /></button>
+      </div>
+
+      <div v-if="isGlobalSearch" class="global-search-banner">
+        <Search :size="13" />
+        Buscando en todos los estados — {{ filteredProjects.length }} resultado{{ filteredProjects.length !== 1 ? 's' : '' }}
+        <button @click="search = ''" class="clear-search">Limpiar <X :size="11" /></button>
+      </div>
+
       <div v-if="store.loading" class="loading-state">
         <Loader2 :size="24" class="spin" />
       </div>
@@ -100,7 +118,43 @@
         </button>
       </div>
 
-      <table v-else class="projects-table">
+      <template v-else>
+        <!-- Mobile cards -->
+        <div class="mobile-cards">
+          <div
+            v-for="p in filteredProjects"
+            :key="p.id + '-m'"
+            class="mobile-card"
+            @click="openDrawer(p)"
+          >
+            <div class="mc-top">
+              <div class="mc-badges">
+                <StatusBadge :status="p.status" />
+                <span v-if="p.waitingClose" class="waiting-badge"><Hourglass :size="10" /> Pend. cierre</span>
+                <span v-if="p.probono" class="probono-tag"><Heart :size="10" /> Pro Bono</span>
+                <span v-if="p.isPersonal" class="personal-tag">φ Propio</span>
+              </div>
+              <div class="mc-actions" @click.stop>
+                <button class="action-btn" @click="editProject(p)"><Pencil :size="13" /></button>
+                <button class="action-btn danger" @click="archiveProject(p)"><Archive :size="13" /></button>
+              </div>
+            </div>
+            <p class="mc-title">{{ p.title }}</p>
+            <p class="mc-client client-link" @click.stop="clientFilter = clientFilter === p.client ? '' : p.client">{{ p.client }}</p>
+            <div class="mc-footer">
+              <span class="days-badge" :class="daysClass(p.deliveryDate)">{{ daysRemaining(p.deliveryDate) }}</span>
+              <span class="mc-amount">
+                <span v-if="p.probono || p.isPersonal" class="probono-amount">{{ p.probono ? 'Pro Bono' : 'Propio' }}</span>
+                <span v-else-if="p.priceUndefined" class="undefined-amount">Por definir</span>
+                <span v-else>${{ (p.totalAmount || 0).toLocaleString() }}</span>
+              </span>
+              <PriorityBadge :priority="p.priority || 'medium'" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Desktop table -->
+        <table class="projects-table">
         <thead>
           <tr>
             <th @click="setSort('title')" class="sortable">
@@ -146,7 +200,11 @@
                 <FolderOpen v-if="p.docsCount > 0" :size="12" class="ind-icon" title="Tiene archivos" />
               </span>
             </td>
-            <td class="td-secondary">{{ p.client }}</td>
+            <td class="td-secondary">
+              <span class="client-link" @click.stop="clientFilter = clientFilter === p.client ? '' : p.client">
+                {{ p.client }}
+              </span>
+            </td>
             <td class="td-secondary">{{ formatDate(p.deliveryDate) }}</td>
             <td>
               <span class="days-badge" :class="daysClass(p.deliveryDate)">
@@ -183,6 +241,7 @@
           </tr>
         </tbody>
       </table>
+      </template>
     </div>
 
     <ProjectModal
@@ -207,8 +266,8 @@ import { storeToRefs } from 'pinia'
 import {
   Plus, Briefcase, Clock, DollarSign, AlertTriangle,
   LayoutList, FolderOpen, Loader2, Pencil, Archive,
-  ArrowUp, ArrowDown, ArrowUpDown, Heart, Search,
-  ListTodo, FileText, Hourglass,
+  ArrowUp, ArrowDown, ArrowUpDown, Heart, Search, X, User,
+  ListTodo, FileText, Hourglass, Download,
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { useProjectsStore } from '@/stores/projects'
@@ -234,6 +293,7 @@ const editingProject = ref(null)
 const drawerProject = ref(null)
 const activeTab = ref('active')
 const search = ref('')
+const clientFilter = ref('')
 
 // Inline sort icon component
 const SortIcon = (props) => {
@@ -314,13 +374,25 @@ const tabs = [
 
 const PRIORITY_ORDER = { high: 3, medium: 2, low: 1 }
 
+const isGlobalSearch = computed(() => search.value.trim().length > 0)
+const isClientFilter = computed(() => clientFilter.value.length > 0)
+
 const filteredProjects = computed(() => {
   const q = search.value.toLowerCase().trim()
-  let list = projects.value.filter((p) => {
-    if (p.status !== activeTab.value) return false
-    if (!q) return true
-    return p.title?.toLowerCase().includes(q) || p.client?.toLowerCase().includes(q)
-  })
+  let list
+
+  if (q) {
+    list = projects.value.filter((p) =>
+      p.status !== 'archived' &&
+      (p.title?.toLowerCase().includes(q) || p.client?.toLowerCase().includes(q))
+    )
+  } else {
+    list = projects.value.filter((p) => p.status === activeTab.value)
+  }
+
+  if (clientFilter.value) {
+    list = list.filter((p) => p.client === clientFilter.value)
+  }
 
   if (sortKey.value) {
     list = [...list].sort((a, b) => {
@@ -390,6 +462,38 @@ function onSaved(status) {
   }
 }
 
+function exportCSV() {
+  const STATUS = { active: 'Activo', pending: 'En espera', not_approved: 'No aprobado', archived: 'Archivado' }
+  const PRIORITY = { high: 'Alta', medium: 'Media', low: 'Baja' }
+  const fmt = (v) => {
+    if (!v) return ''
+    const d = v?.toDate?.() ?? new Date(v)
+    return d.toLocaleDateString('es')
+  }
+  const rows = [
+    ['Titulo', 'Cliente', 'Estado', 'Prioridad', 'Servicio', 'Monto', 'Cobrado', 'Pendiente', 'Inicio', 'Entrega', 'Pro Bono', 'Personal'],
+    ...projects.value.map((p) => [
+      p.title,
+      p.client,
+      STATUS[p.status] ?? p.status,
+      PRIORITY[p.priority] ?? '',
+      p.serviceType ?? '',
+      p.probono || p.isPersonal ? '' : (p.totalAmount ?? ''),
+      p.probono || p.isPersonal ? '' : ((p.advanceAmount || 0) + (p.milestonesCollected || 0)),
+      p.probono || p.isPersonal ? '' : Math.max(0, (p.totalAmount || 0) - (p.advanceAmount || 0) - (p.milestonesCollected || 0)),
+      fmt(p.startDate),
+      fmt(p.deliveryDate),
+      p.probono ? 'Si' : '',
+      p.isPersonal ? 'Si' : '',
+    ]),
+  ]
+  const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }))
+  a.download = `phiprojects_${new Date().toISOString().split('T')[0]}.csv`
+  a.click()
+}
+
 async function archiveProject(p) {
   const ok = await confirm(`Archivar "${p.title}"?`)
   if (!ok) return
@@ -425,6 +529,34 @@ async function archiveProject(p) {
   font-size: 0.875rem;
   color: var(--color-text-secondary);
   margin: 0;
+}
+
+.header-btns {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.btn-outline-sm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-light);
+  border-radius: 10px;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-outline-sm:hover {
+  border-color: var(--color-brand);
+  color: var(--color-brand-light);
 }
 
 .btn-new {
@@ -808,6 +940,55 @@ th.sortable:hover { color: var(--color-text-secondary); }
   color: #ec4899;
 }
 
+.client-link {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin: -1px -4px;
+  transition: all 0.15s;
+}
+
+.client-link:hover {
+  background: color-mix(in srgb, var(--color-brand) 12%, transparent);
+  color: var(--color-brand-light);
+}
+
+.client-banner {
+  background: color-mix(in srgb, #06b6d4 6%, transparent);
+}
+
+.global-search-banner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 24px;
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--color-brand) 6%, transparent);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.clear-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.clear-search:hover {
+  border-color: var(--color-brand);
+  color: var(--color-brand-light);
+}
+
 .undefined-amount {
   font-size: 0.72rem;
   font-weight: 600;
@@ -880,4 +1061,100 @@ th.sortable:hover { color: var(--color-text-secondary); }
 
 .spin { animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Responsive ── */
+.mobile-cards { display: none; }
+
+@media (max-width: 767px) {
+  .dashboard { padding: 16px; }
+
+  .stats-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat-card { padding: 14px; gap: 10px; }
+  .stat-icon { width: 36px; height: 36px; }
+  .stat-value { font-size: 1.2rem; }
+
+  .finance-bar { flex-wrap: wrap; gap: 12px; padding: 12px 16px; }
+  .fi-sep { display: none; }
+  .finance-item { flex: 1; min-width: 100px; }
+
+  .dash-header { flex-direction: column; gap: 12px; }
+  .dash-header h1 { font-size: 1.3rem; }
+  .header-btns { width: 100%; }
+  .btn-new { flex: 1; justify-content: center; }
+  .btn-outline-sm .btn-label { display: none; }
+  .btn-outline-sm { padding: 9px; }
+
+  .card-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .header-right { width: 100%; }
+  .search-input { width: 100%; }
+  .search-input:focus { width: 100%; }
+
+  .mobile-cards { display: flex; flex-direction: column; gap: 0; }
+  .projects-table { display: none; }
+}
+
+.mobile-card {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--color-border);
+  cursor: pointer;
+  transition: background 0.1s;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.mobile-card:last-child { border-bottom: none; }
+.mobile-card:active { background: var(--color-bg-elevated); }
+
+.mc-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mc-badges {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.mc-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.mc-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.mc-client {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.mc-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mc-amount {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin-left: auto;
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .dashboard { padding: 20px; }
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+}
 </style>

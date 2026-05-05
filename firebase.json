@@ -1,4 +1,8 @@
 {
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
   "hosting": {
     "target": "phiprojects",
     "public": "dist",
@@ -15,9 +19,15 @@
     ],
     "headers": [
       {
+        "source": "/index.html",
+        "headers": [
+          { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+        ]
+      },
+      {
         "source": "**/*.@(js|css)",
         "headers": [
-          { "key": "Cache-Control", "value": "max-age=31536000" }
+          { "key": "Cache-Control", "value": "max-age=31536000, immutable" }
         ]
       },
       {

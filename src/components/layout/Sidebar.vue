@@ -14,6 +14,10 @@
         </svg>
       </div>
       <span class="logo-text">PhiProjects</span>
+      <button class="theme-icon-btn" @click="toggle" :title="dark ? 'Modo claro' : 'Modo oscuro'">
+        <Sun v-if="dark" :size="15" />
+        <Moon v-else :size="15" />
+      </button>
     </div>
 
     <nav class="sidebar-nav">
@@ -24,19 +28,18 @@
         <span>Dashboard</span>
       </RouterLink>
 
+      <RouterLink to="/tasks" class="nav-item" :class="{ active: route.name === 'Tasks' }">
+        <ClipboardList :size="18" />
+        <span>Tareas</span>
+      </RouterLink>
+
       <RouterLink to="/archive" class="nav-item" :class="{ active: route.name === 'Archive' }">
         <Archive :size="18" />
         <span>Archivo</span>
       </RouterLink>
     </nav>
 
-    <div class="theme-toggle-wrap">
-      <button class="theme-toggle" @click="toggle" :title="dark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'">
-        <Sun v-if="dark" :size="15" />
-        <Moon v-else :size="15" />
-        <span>{{ dark ? 'Modo claro' : 'Modo oscuro' }}</span>
-      </button>
-    </div>
+
 
     <div class="sidebar-footer">
       <div class="user-info">
@@ -59,7 +62,7 @@
 <script setup>
 import { useRoute, RouterLink, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import { LayoutDashboard, Archive, LogOut, Sun, Moon } from 'lucide-vue-next'
+import { LayoutDashboard, Archive, LogOut, Sun, Moon, ClipboardList } from 'lucide-vue-next'
 import { storeToRefs } from 'pinia'
 import { useTheme } from '@/composables/useTheme'
 
@@ -87,12 +90,47 @@ async function handleLogout() {
   flex-shrink: 0;
 }
 
+@media (max-width: 767px) {
+  .sidebar { display: none; }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .sidebar { width: 64px; }
+  .logo-text, .nav-section-label, .nav-item span,
+  .user-details, .theme-icon-btn { display: none; }
+  .sidebar-logo { justify-content: center; padding: 0 0 20px; }
+  .nav-item { justify-content: center; padding: 10px; }
+  .sidebar-footer { justify-content: center; padding: 16px 0 0; }
+  .user-info { justify-content: center; }
+}
+
 .sidebar-logo {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 0 20px 24px;
   border-bottom: 1px solid var(--color-border);
+}
+
+.theme-icon-btn {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.theme-icon-btn:hover {
+  border-color: var(--color-brand);
+  color: var(--color-brand-light);
 }
 
 .logo-icon svg {
@@ -226,29 +264,5 @@ async function handleLogout() {
   color: var(--color-rejected);
 }
 
-.theme-toggle-wrap {
-  padding: 0 12px 12px;
-}
 
-.theme-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 8px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-elevated);
-  color: var(--color-text-secondary);
-  font-size: 0.8rem;
-  font-weight: 500;
-  font-family: inherit;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.theme-toggle:hover {
-  border-color: var(--color-brand);
-  color: var(--color-brand-light);
-}
 </style>

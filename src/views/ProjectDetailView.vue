@@ -700,9 +700,12 @@ async function saveNotes() {
   to { transform: rotate(360deg); }
 }
 
-@media (max-width: 768px) {
-  .detail-grid {
-    grid-template-columns: 1fr;
-  }
+@media (max-width: 767px) {
+  .detail-page { padding: 16px; }
+  .detail-grid { grid-template-columns: 1fr; }
+  .detail-header { flex-direction: column; gap: 12px; }
+  .header-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+  .detail-header h1 { font-size: 1.3rem; }
+  .countdown-banner { flex-direction: column; align-items: flex-start; gap: 6px; }
 }
 </style>

@@ -8,11 +8,12 @@ import {
   deleteDoc,
   onSnapshot,
   query,
+  where,
   orderBy,
   serverTimestamp,
   getDocs,
 } from 'firebase/firestore'
-import { db } from '@/firebase'
+import { db, auth } from '@/firebase'
 
 export const useProjectsStore = defineStore('projects', () => {
   const projects = ref([])
@@ -20,9 +21,15 @@ export const useProjectsStore = defineStore('projects', () => {
   let unsubscribe = null
 
   function subscribe() {
-    if (unsubscribe) return // already subscribed
+    if (unsubscribe) return
+    const uid = auth.currentUser?.uid
+    if (!uid) return
     loading.value = true
-    const q = query(collection(db, 'projects'), orderBy('createdAt', 'desc'))
+    const q = query(
+      collection(db, 'projects'),
+      where('ownerId', '==', uid),
+      orderBy('createdAt', 'desc')
+    )
     unsubscribe = onSnapshot(
       q,
       (snap) => {
@@ -30,7 +37,7 @@ export const useProjectsStore = defineStore('projects', () => {
         loading.value = false
       },
       () => {
-        loading.value = false // don't hang on permission errors
+        loading.value = false
       }
     )
   }
@@ -45,8 +52,11 @@ export const useProjectsStore = defineStore('projects', () => {
   }
 
   async function createProject(data) {
+    const uid = auth.currentUser?.uid
+    if (!uid) throw new Error('No autenticado')
     await addDoc(collection(db, 'projects'), {
       ...data,
+      ownerId: uid,
       status: data.status || 'active',
       priority: data.priority || 'medium',
       notes: data.notes || '',
@@ -95,6 +105,10 @@ export const useProjectsStore = defineStore('projects', () => {
 
   async function toggleTodo(projectId, todoId, completed) {
     await updateDoc(doc(db, 'projects', projectId, 'todos', todoId), { completed })
+  }
+
+  async function updateTodo(projectId, todoId, text) {
+    await updateDoc(doc(db, 'projects', projectId, 'todos', todoId), { text })
   }
 
   async function deleteTodo(projectId, todoId) {
@@ -199,6 +213,7 @@ export const useProjectsStore = defineStore('projects', () => {
     subscribeTodos,
     addTodo,
     toggleTodo,
+    updateTodo,
     deleteTodo,
     subscribeMilestones,
     addMilestone,

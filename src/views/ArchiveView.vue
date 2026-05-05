@@ -429,4 +429,11 @@ async function confirmDelete(p) {
 
 .spin { animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 767px) {
+  .archive-page { padding: 16px; }
+  .page-header h1 { font-size: 1.2rem; }
+  .year-card { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .projects-grid { grid-template-columns: 1fr; }
+}
 </style>

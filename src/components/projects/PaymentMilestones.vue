@@ -4,6 +4,7 @@
       <h3><Milestone :size="16" /> Hitos de Pago</h3>
     </div>
 
+    <p v-if="!milestones.length" class="empty-hint">Sin hitos. Agrega pagos parciales abajo.</p>
     <ul class="milestone-list">
       <li v-for="m in milestones" :key="m.id" class="milestone-item" :class="{ extra: m.isExtra }">
         <button class="check-btn" :class="{ paid: m.paid }" @click="toggle(m)">
@@ -114,6 +115,13 @@ async function addNew() {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.empty-hint {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+  margin: 0;
 }
 
 .section-header h3 {

@@ -10,4 +10,15 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore'],
+          'vue-core': ['vue', 'vue-router', 'pinia'],
+          'icons': ['lucide-vue-next'],
+        },
+      },
+    },
+  },
 })

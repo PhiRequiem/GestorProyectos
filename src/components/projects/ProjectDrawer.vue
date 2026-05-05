@@ -150,6 +150,11 @@ async function toggleCompleted() {
   animation: slideIn 0.2s ease;
 }
 
+@media (max-width: 767px) {
+  .drawer { width: 100%; border-left: none; }
+  .drawer-backdrop { background: var(--color-bg-base); }
+}
+
 @keyframes slideIn {
   from { transform: translateX(100%); }
   to { transform: translateX(0); }
