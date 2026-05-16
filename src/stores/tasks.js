@@ -43,6 +43,10 @@ export const useTasksStore = defineStore('tasks', () => {
     await updateDoc(doc(db, 'taskLists', listId), { name })
   }
 
+  async function updateList(listId, data) {
+    await updateDoc(doc(db, 'taskLists', listId), data)
+  }
+
   async function deleteList(listId) {
     await deleteDoc(doc(db, 'taskLists', listId))
   }
@@ -56,6 +60,13 @@ export const useTasksStore = defineStore('tasks', () => {
     return onSnapshot(q, (snap) => {
       callback(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     }, () => callback([]))
+  }
+
+  async function clearCompletedTasks(listId) {
+    const snap = await getDocs(collection(db, 'taskLists', listId, 'tasks'))
+    const completed = snap.docs.filter((d) => d.data().completed)
+    await Promise.all(completed.map((d) => deleteDoc(doc(db, 'taskLists', listId, 'tasks', d.id))))
+    await _syncPendingCount(listId)
   }
 
   async function _syncPendingCount(listId) {
@@ -86,13 +97,9 @@ export const useTasksStore = defineStore('tasks', () => {
     await updateDoc(doc(db, 'taskLists', listId, 'tasks', taskId), data)
   }
 
-  async function updateTask(listId, taskId, data) {
-    await updateDoc(doc(db, 'taskLists', listId, 'tasks', taskId), data)
-  }
-
   return {
     lists, subscribeLists, unsubscribeAll,
-    createList, renameList, deleteList,
-    subscribeTasks, addTask, toggleTask, deleteTask, updateTask,
+    createList, renameList, updateList, deleteList,
+    subscribeTasks, addTask, toggleTask, deleteTask, updateTask, clearCompletedTasks,
   }
 })

@@ -15,7 +15,7 @@
           <PriorityBadge :priority="project.priority || 'medium'" />
           <ServiceBadge :service="project.serviceType || 'other'" />
           <span v-if="project.probono" class="kind-badge probono-badge"><Heart :size="11" /> Pro Bono</span>
-          <span v-if="project.isPersonal" class="kind-badge personal-badge">φ Propio</span>
+          <span v-if="project.isPersonal" class="kind-badge personal-badge">φ</span>
         </div>
         <h1>{{ project.title }}</h1>
         <p class="client-name"><Building2 :size="14" /> {{ project.client }}</p>
@@ -23,6 +23,20 @@
       <div class="header-actions">
         <button class="btn-outline" @click="showModal = true">
           <Pencil :size="15" /> Editar
+        </button>
+        <button
+          v-if="project.status === 'active' && !project.waitingClose"
+          class="btn-outline"
+          @click="toggleWaitingClose"
+        >
+          <Hourglass :size="15" /> Marcar terminado
+        </button>
+        <button
+          v-if="project.status === 'active' && project.waitingClose"
+          class="btn-outline waiting-action"
+          @click="toggleWaitingClose"
+        >
+          <Hourglass :size="15" /> En espera de cierre
         </button>
         <button
           v-if="project.status === 'active' && project.waitingClose"
@@ -40,6 +54,9 @@
         </button>
         <button v-if="project.status !== 'active'" class="btn-outline success" @click="changeStatus('active')">
           <RefreshCw :size="15" /> Reactivar
+        </button>
+        <button class="btn-outline delete" @click="deleteProject">
+          <Trash2 :size="15" />
         </button>
       </div>
     </div>
@@ -68,9 +85,9 @@
             <strong v-if="project.priceUndefined" class="muted-val">Por definir</strong>
             <strong v-else>${{ (project.totalAmount || 0).toLocaleString() }}</strong>
           </div>
-          <div class="finance-row">
+          <div v-if="project.advanceAmount > 0" class="finance-row">
             <span>Adelanto</span>
-            <strong class="green">${{ (project.advanceAmount || 0).toLocaleString() }}</strong>
+            <strong class="green">${{ project.advanceAmount.toLocaleString() }}</strong>
           </div>
           <div v-if="milestonesCollectedLive > 0" class="finance-row">
             <span>Hitos cobrados</span>
@@ -162,7 +179,7 @@ import { useRoute, RouterLink, useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import {
   ChevronRight, Building2, Pencil, Archive, RefreshCw, Clock,
-  DollarSign, FileText, Check, Loader2, CheckCheck, Heart,
+  DollarSign, FileText, Check, Loader2, CheckCheck, Heart, Hourglass, Trash2,
 } from 'lucide-vue-next'
 import { useProjectsStore } from '@/stores/projects'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
@@ -179,6 +196,7 @@ const route = useRoute()
 const router = useRouter()
 const store = useProjectsStore()
 const toast = useToast()
+const { confirm } = useConfirm()
 const projectId = computed(() => route.params.id)
 const loading = computed(() => store.loading)
 const showModal = ref(false)
@@ -261,7 +279,24 @@ const daysClass = computed(() => {
   return 'ok'
 })
 
+async function deleteProject() {
+  const ok = await confirm(`¿Eliminar "${project.value?.title}" permanentemente?`, { danger: true })
+  if (!ok) return
+  await store.deleteProject(projectId.value)
+  router.push('/')
+}
+
+async function toggleWaitingClose() {
+  const next = !project.value.waitingClose
+  await store.updateProject(projectId.value, { waitingClose: next })
+  toast.success(next ? 'Marcado como en espera de cierre' : 'Indicador removido')
+}
+
 async function changeStatus(status) {
+  if (status === 'archived') {
+    const ok = await confirm(`Archivar "${project.value?.title}"?`)
+    if (!ok) return
+  }
   const extra = status === 'archived' ? { closedAt: new Date().toISOString() } : {}
   await store.updateProject(projectId.value, { status, ...extra })
   const labels = { archived: 'Proyecto archivado', active: 'Proyecto reactivado' }
@@ -269,8 +304,7 @@ async function changeStatus(status) {
 }
 
 async function closeProject() {
-  const { confirm } = useConfirm()
-  const ok = await confirm('Cerrar proyecto como terminado y pagado? Se movera al archivo.')
+  const ok = await confirm('¿Cerrar proyecto como terminado y pagado? Se moverá al archivo.')
   if (!ok) return
   try {
     await store.updateProject(projectId.value, { status: 'archived', waitingClose: false, closedAt: new Date().toISOString() })
@@ -424,6 +458,26 @@ async function saveNotes() {
 .btn-outline.warning:hover {
   border-color: var(--color-archived);
   color: var(--color-archived);
+}
+
+.btn-outline.delete {
+  margin-left: 8px;
+  padding: 8px 10px;
+}
+
+.btn-outline.delete:hover {
+  border-color: var(--color-rejected);
+  color: var(--color-rejected);
+}
+
+.btn-outline.waiting-action {
+  border-color: color-mix(in srgb, #f59e0b 40%, transparent);
+  color: #f59e0b;
+}
+
+.btn-outline.waiting-action:hover {
+  background: color-mix(in srgb, #f59e0b 10%, transparent);
+  border-color: #f59e0b;
 }
 
 .btn-outline.close-btn-action {

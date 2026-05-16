@@ -85,6 +85,7 @@
             :key="tab.value"
             class="tab-btn"
             :class="{ active: activeTab === tab.value }"
+            :data-tab="tab.value"
             @click="activeTab = tab.value"
           >
             {{ tab.label }}
@@ -131,12 +132,8 @@
               <div class="mc-badges">
                 <StatusBadge :status="p.status" />
                 <span v-if="p.waitingClose" class="waiting-badge"><Hourglass :size="10" /> Pend. cierre</span>
-                <span v-if="p.probono" class="probono-tag"><Heart :size="10" /> Pro Bono</span>
-                <span v-if="p.isPersonal" class="personal-tag">φ Propio</span>
-              </div>
-              <div class="mc-actions" @click.stop>
-                <button class="action-btn" @click="editProject(p)"><Pencil :size="13" /></button>
-                <button class="action-btn danger" @click="archiveProject(p)"><Archive :size="13" /></button>
+                <span v-if="p.probono" class="probono-tag"><Heart :size="10" /></span>
+                <span v-if="p.isPersonal" class="personal-tag">φ</span>
               </div>
             </div>
             <p class="mc-title">{{ p.title }}</p>
@@ -177,7 +174,6 @@
             </th>
             <th>Servicio</th>
             <th>Estado</th>
-            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -191,9 +187,9 @@
             <td class="td-title">
               <span class="title-text">{{ p.title }}</span>
               <span v-if="p.probono" class="probono-tag">
-                <Heart :size="10" /> Pro Bono
+                <Heart :size="10" />
               </span>
-              <span v-if="p.isPersonal" class="personal-tag">φ Propio</span>
+              <span v-if="p.isPersonal" class="personal-tag">φ</span>
               <span class="content-indicators">
                 <ListTodo v-if="p.todosCount > 0" :size="12" class="ind-icon" title="Tiene tareas" />
                 <FileText v-if="p.notes?.trim()" :size="12" class="ind-icon" title="Tiene notas" />
@@ -228,16 +224,6 @@
                 </span>
               </div>
             </td>
-            <td @click.stop>
-              <div class="row-actions">
-                <button class="action-btn" title="Editar" @click="editProject(p)">
-                  <Pencil :size="13" />
-                </button>
-                <button class="action-btn danger" title="Archivar" @click="archiveProject(p)">
-                  <Archive :size="13" />
-                </button>
-              </div>
-            </td>
           </tr>
         </tbody>
       </table>
@@ -254,7 +240,8 @@
     <ProjectDrawer
       v-if="drawerProject"
       :project="drawerProject"
-      @close="drawerProject = null"
+      @close="drawerProjectId = null"
+      @saved="onSaved"
     />
   </div>
 </template>
@@ -265,7 +252,7 @@ import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import {
   Plus, Briefcase, Clock, DollarSign, AlertTriangle,
-  LayoutList, FolderOpen, Loader2, Pencil, Archive,
+  LayoutList, FolderOpen, Loader2,
   ArrowUp, ArrowDown, ArrowUpDown, Heart, Search, X, User,
   ListTodo, FileText, Hourglass, Download,
 } from 'lucide-vue-next'
@@ -290,7 +277,10 @@ const { confirm } = useConfirm()
 
 const showModal = ref(false)
 const editingProject = ref(null)
-const drawerProject = ref(null)
+const drawerProjectId = ref(null)
+const drawerProject = computed(() =>
+  drawerProjectId.value ? projects.value.find((p) => p.id === drawerProjectId.value) ?? null : null
+)
 const activeTab = ref('active')
 const search = ref('')
 const clientFilter = ref('')
@@ -368,6 +358,7 @@ const urgentCount = computed(() =>
 
 const tabs = [
   { label: 'Activos', value: 'active' },
+  { label: 'Pend. cierre', value: 'waiting_close' },
   { label: 'En espera', value: 'pending' },
   { label: 'No aprobado', value: 'not_approved' },
 ]
@@ -386,6 +377,10 @@ const filteredProjects = computed(() => {
       p.status !== 'archived' &&
       (p.title?.toLowerCase().includes(q) || p.client?.toLowerCase().includes(q))
     )
+  } else if (activeTab.value === 'waiting_close') {
+    list = projects.value.filter((p) => p.status === 'active' && p.waitingClose)
+  } else if (activeTab.value === 'active') {
+    list = projects.value.filter((p) => p.status === 'active' && !p.waitingClose)
   } else {
     list = projects.value.filter((p) => p.status === activeTab.value)
   }
@@ -427,6 +422,8 @@ const filteredProjects = computed(() => {
 })
 
 function tabCount(status) {
+  if (status === 'waiting_close') return projects.value.filter((p) => p.status === 'active' && p.waitingClose).length
+  if (status === 'active') return projects.value.filter((p) => p.status === 'active' && !p.waitingClose).length
   return projects.value.filter((p) => p.status === status).length
 }
 
@@ -441,13 +438,8 @@ function openNewProject() {
   showModal.value = true
 }
 
-function editProject(p) {
-  editingProject.value = p
-  showModal.value = true
-}
-
 function openDrawer(p) {
-  drawerProject.value = p
+  drawerProjectId.value = p.id
 }
 
 function closeModal() {
@@ -479,8 +471,8 @@ function exportCSV() {
       PRIORITY[p.priority] ?? '',
       p.serviceType ?? '',
       p.probono || p.isPersonal ? '' : (p.totalAmount ?? ''),
-      p.probono || p.isPersonal ? '' : ((p.advanceAmount || 0) + (p.milestonesCollected || 0)),
-      p.probono || p.isPersonal ? '' : Math.max(0, (p.totalAmount || 0) - (p.advanceAmount || 0) - (p.milestonesCollected || 0)),
+      p.probono || p.isPersonal ? '' : (p.milestonesCollected || 0),
+      p.probono || p.isPersonal ? '' : Math.max(0, (p.totalAmount || 0) - (p.milestonesCollected || 0)),
       fmt(p.startDate),
       fmt(p.deliveryDate),
       p.probono ? 'Si' : '',
@@ -500,6 +492,7 @@ async function archiveProject(p) {
   await store.updateProject(p.id, { status: 'archived', closedAt: new Date().toISOString() })
   toast.success('Proyecto archivado')
 }
+
 </script>
 
 <style scoped>
@@ -784,6 +777,12 @@ async function archiveProject(p) {
   border-color: color-mix(in srgb, var(--color-brand) 30%, transparent);
 }
 
+.tab-btn[data-tab="waiting_close"].active {
+  background: color-mix(in srgb, #f59e0b 12%, transparent);
+  color: #f59e0b;
+  border-color: color-mix(in srgb, #f59e0b 30%, transparent);
+}
+
 .tab-count {
   background: var(--color-bg-elevated);
   border-radius: 99px;
@@ -887,7 +886,12 @@ th.sortable:hover { color: var(--color-text-secondary); }
   gap: 6px;
 }
 
-.title-text { flex-shrink: 0; }
+.title-text {
+  max-width: clamp(120px, 18vw, 220px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .status-cell {
   display: flex;
@@ -1033,31 +1037,6 @@ th.sortable:hover { color: var(--color-text-secondary); }
 .days-badge.critical{ background: color-mix(in srgb, var(--color-rejected) 15%, transparent); color: var(--color-rejected); }
 .days-badge.overdue { background: color-mix(in srgb, var(--color-rejected) 20%, transparent); color: var(--color-rejected); font-weight: 800; }
 
-.row-actions {
-  display: flex;
-  gap: 4px;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-.project-row:hover .row-actions { opacity: 1; }
-
-.action-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  border: 1px solid var(--color-border);
-  background: var(--color-bg-elevated);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.action-btn:hover { border-color: var(--color-brand); color: var(--color-brand-light); }
-.action-btn.danger:hover { border-color: var(--color-rejected); color: var(--color-rejected); }
 
 .spin { animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -1118,12 +1097,6 @@ th.sortable:hover { color: var(--color-text-secondary); }
   align-items: center;
   gap: 5px;
   flex-wrap: wrap;
-}
-
-.mc-actions {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
 }
 
 .mc-title {

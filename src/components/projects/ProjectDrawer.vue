@@ -9,12 +9,32 @@
             <p class="client">{{ project.client }}</p>
           </div>
           <div class="drawer-header-actions">
+            <button
+              v-if="project.status === 'active'"
+              class="drawer-icon-btn"
+              :class="{ amber: project.waitingClose }"
+              :title="project.waitingClose ? 'Desmarcar trabajo terminado' : 'Marcar trabajo terminado'"
+              @click="toggleWaitingClose"
+            >
+              <Hourglass :size="14" />
+            </button>
+            <button class="drawer-icon-btn" title="Editar proyecto" @click="showModal = true">
+              <Pencil :size="14" />
+            </button>
             <button v-if="project.status === 'pending'" class="btn-approve" @click="approveProject">
               <CheckCircle2 :size="14" /> Aprobar
             </button>
             <RouterLink :to="`/projects/${project.id}`" class="btn-detail">
               <ExternalLink :size="14" /> Ver detalle
             </RouterLink>
+            <button
+              v-if="project.status !== 'archived'"
+              class="drawer-icon-btn danger"
+              title="Archivar proyecto"
+              @click="archiveProject"
+            >
+              <Archive :size="14" />
+            </button>
             <button class="close-btn" @click="closeDrawer()">
               <X :size="18" />
             </button>
@@ -37,15 +57,6 @@
         <div class="drawer-body">
           <div v-if="activeTab === 'todos'" class="todos-tab">
             <TodoList :projectId="project.id" />
-            <div class="completed-toggle" :class="{ done: project.waitingClose }" @click="toggleCompleted">
-              <div class="completed-icon">
-                <CheckCheck :size="16" />
-              </div>
-              <div class="completed-text">
-                <span class="completed-label">{{ project.waitingClose ? 'En espera de cierre' : 'Marcar como terminado' }}</span>
-                <span class="completed-hint">{{ project.waitingClose ? 'Trabajo listo — pendiente de revision o pago' : 'El trabajo esta listo pero aun no se cierra' }}</span>
-              </div>
-            </div>
           </div>
 
           <div v-else-if="activeTab === 'notes'" class="notes-panel">
@@ -62,28 +73,39 @@
         </div>
       </div>
     </div>
+
+    <ProjectModal
+      v-if="showModal"
+      :project="project"
+      @close="showModal = false"
+      @saved="emit('saved', $event)"
+    />
   </Teleport>
 </template>
 
 <script setup>
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import { X, ExternalLink, ListTodo, FileText, FolderOpen, CheckCheck, CheckCircle2 } from 'lucide-vue-next'
+import { X, ExternalLink, ListTodo, FileText, FolderOpen, CheckCircle2, Pencil, Archive, Hourglass } from 'lucide-vue-next'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
 import TodoList from '@/components/projects/TodoList.vue'
 import DocumentsSection from '@/components/projects/DocumentsSection.vue'
+import ProjectModal from '@/components/projects/ProjectModal.vue'
 import { useProjectsStore } from '@/stores/projects'
 import { useToast } from '@/composables/useToast'
+import { useConfirm } from '@/composables/useConfirm'
 
 const props = defineProps({
   project: { type: Object, required: true },
 })
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'saved'])
 const toast = useToast()
+const { confirm } = useConfirm()
 
 const store = useProjectsStore()
 const activeTab = ref('todos')
+const showModal = ref(false)
 const notesValue = ref(props.project.notes || '')
 
 const tabs = [
@@ -121,7 +143,15 @@ async function approveProject() {
   toast.success('Proyecto aprobado')
 }
 
-async function toggleCompleted() {
+async function archiveProject() {
+  const ok = await confirm(`Archivar "${props.project.title}"?`)
+  if (!ok) return
+  await store.updateProject(props.project.id, { status: 'archived', closedAt: new Date().toISOString() })
+  toast.success('Proyecto archivado')
+  emit('close')
+}
+
+async function toggleWaitingClose() {
   const next = !props.project.waitingClose
   await store.updateProject(props.project.id, { waitingClose: next })
   toast.success(next ? 'Marcado como en espera de cierre' : 'Indicador removido')
@@ -209,6 +239,26 @@ async function toggleCompleted() {
   background: color-mix(in srgb, var(--color-active) 18%, transparent);
 }
 
+.drawer-icon-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.drawer-icon-btn:hover { border-color: var(--color-brand); color: var(--color-brand-light); }
+.drawer-icon-btn.danger:hover { border-color: var(--color-rejected); color: var(--color-rejected); }
+.drawer-icon-btn.amber { color: #f59e0b; border-color: color-mix(in srgb, #f59e0b 40%, transparent); }
+.drawer-icon-btn.amber:hover { border-color: #f59e0b; color: #f59e0b; }
+
 .btn-detail {
   display: flex;
   align-items: center;
@@ -289,57 +339,6 @@ async function toggleCompleted() {
   gap: 16px;
 }
 
-.completed-toggle {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: 10px;
-  border: 1.5px dashed var(--color-border-light);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  margin-top: 4px;
-}
-
-.completed-toggle:hover {
-  border-color: #06b6d4;
-  background: color-mix(in srgb, #06b6d4 5%, transparent);
-}
-
-.completed-toggle.done {
-  border-style: solid;
-  border-color: #06b6d4;
-  background: color-mix(in srgb, #06b6d4 8%, transparent);
-}
-
-.completed-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  background: color-mix(in srgb, #06b6d4 15%, transparent);
-  color: #06b6d4;
-}
-
-.completed-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.completed-label {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: var(--color-text-primary);
-}
-
-.completed-hint {
-  font-size: 0.72rem;
-  color: var(--color-text-muted);
-}
 
 .notes-panel {
   display: flex;

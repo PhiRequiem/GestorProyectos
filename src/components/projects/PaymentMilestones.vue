@@ -6,7 +6,7 @@
 
     <p v-if="!milestones.length" class="empty-hint">Sin hitos. Agrega pagos parciales abajo.</p>
     <ul class="milestone-list">
-      <li v-for="m in milestones" :key="m.id" class="milestone-item" :class="{ extra: m.isExtra }">
+      <li v-for="(m, index) in sortedMilestones" :key="m.id" class="milestone-item" :class="{ extra: m.isExtra }">
         <button class="check-btn" :class="{ paid: m.paid }" @click="toggle(m)">
           <Check v-if="m.paid" :size="11" />
         </button>
@@ -18,6 +18,14 @@
           <span class="milestone-amount" :class="{ extra: m.isExtra }">
             {{ m.isExtra ? '+' : '' }}${{ m.amount?.toLocaleString() || 0 }}
           </span>
+        </div>
+        <div class="reorder-btns">
+          <button class="reorder-btn" :disabled="index === 0" @click="move(index, -1)">
+            <ChevronUp :size="11" />
+          </button>
+          <button class="reorder-btn" :disabled="index === sortedMilestones.length - 1" @click="move(index, 1)">
+            <ChevronDown :size="11" />
+          </button>
         </div>
         <button class="del-btn" @click="remove(m.id)"><X :size="13" /></button>
       </li>
@@ -50,7 +58,7 @@
 
 <script setup>
 import { ref, computed, onUnmounted } from 'vue'
-import { Milestone, Check, X, TrendingUp } from 'lucide-vue-next'
+import { Milestone, Check, X, TrendingUp, ChevronUp, ChevronDown } from 'lucide-vue-next'
 import { useProjectsStore } from '@/stores/projects'
 
 const props = defineProps({
@@ -69,6 +77,14 @@ const unsub = store.subscribeMilestones(props.projectId, (data) => {
 })
 onUnmounted(() => unsub())
 
+const sortedMilestones = computed(() =>
+  [...milestones.value].sort((a, b) => {
+    const oa = a.order ?? a.createdAt?.seconds ?? 0
+    const ob = b.order ?? b.createdAt?.seconds ?? 0
+    return oa - ob
+  })
+)
+
 const regularMilestonesTotal = computed(() =>
   milestones.value.filter((m) => !m.isExtra).reduce((s, m) => s + (m.amount || 0), 0)
 )
@@ -80,6 +96,22 @@ const overLimitWarning = computed(() => {
 
 async function toggle(m) {
   await store.toggleMilestone(props.projectId, m.id, !m.paid)
+}
+
+async function move(index, direction) {
+  const list = sortedMilestones.value
+  const targetIndex = index + direction
+  if (targetIndex < 0 || targetIndex >= list.length) return
+  // Assign explicit orders to all items using their current position, then swap
+  const orders = list.map((m, i) => ({ id: m.id, order: m.order ?? i }))
+  const tmp = orders[index].order
+  orders[index].order = orders[targetIndex].order
+  orders[targetIndex].order = tmp
+  await Promise.all(
+    orders
+      .filter((u, i) => u.order !== (list[i].order ?? i))
+      .map((u) => store.updateMilestone(props.projectId, u.id, { order: u.order }))
+  )
 }
 
 async function remove(id) {
@@ -98,6 +130,7 @@ async function addNew() {
     label: newLabel.value.trim(),
     amount: newAmount.value || 0,
     isExtra: newIsExtra.value,
+    order: milestones.value.length,
   })
   if (newIsExtra.value && newAmount.value > 0) {
     await store.updateProject(props.projectId, {
@@ -228,6 +261,30 @@ async function addNew() {
 }
 
 .milestone-amount.extra { color: var(--color-accent); }
+
+.reorder-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.milestone-item:hover .reorder-btns { opacity: 1; }
+
+.reorder-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 1px;
+  display: flex;
+  line-height: 1;
+  transition: color 0.15s;
+}
+
+.reorder-btn:hover:not(:disabled) { color: var(--color-text-primary); }
+.reorder-btn:disabled { opacity: 0.2; cursor: default; }
 
 .del-btn {
   background: transparent;

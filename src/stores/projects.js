@@ -135,6 +135,10 @@ export const useProjectsStore = defineStore('projects', () => {
     })
   }
 
+  async function updateMilestone(projectId, milestoneId, data) {
+    await updateDoc(doc(db, 'projects', projectId, 'milestones', milestoneId), data)
+  }
+
   async function addMilestone(projectId, data) {
     await addDoc(collection(db, 'projects', projectId, 'milestones'), {
       ...data,
@@ -217,6 +221,7 @@ export const useProjectsStore = defineStore('projects', () => {
     deleteTodo,
     subscribeMilestones,
     addMilestone,
+    updateMilestone,
     toggleMilestone,
     deleteMilestone,
     subscribeDocuments,

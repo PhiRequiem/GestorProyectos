@@ -34,20 +34,43 @@
       </form>
 
       <ul class="list-nav">
-        <li
-          v-for="l in store.lists"
-          :key="l.id"
-          class="list-item"
-          :class="{ active: selectedList?.id === l.id }"
-          @click="selectList(l)"
-        >
-          <span class="list-dot" :style="{ background: l.color || '#6366f1' }"></span>
-          <span class="list-name">{{ l.name }}</span>
-          <span v-if="l.pendingCount" class="list-count">{{ l.pendingCount }}</span>
-          <button class="del-list-btn" @click.stop="confirmDeleteList(l)" title="Eliminar lista">
-            <X :size="12" />
-          </button>
-        </li>
+        <template v-for="l in store.lists" :key="l.id">
+          <!-- Edit mode -->
+          <li v-if="editingListId === l.id" class="list-edit-form" @click.stop>
+            <input v-model="editingName" class="edit-list-input" @keydown.enter="saveListEdit" @keydown.escape="editingListId = null" />
+            <div class="color-picker">
+              <button
+                v-for="c in COLORS" :key="c"
+                type="button"
+                class="color-dot"
+                :style="{ background: c }"
+                :class="{ selected: editingColor === c }"
+                @click="editingColor = c"
+              />
+            </div>
+            <div class="new-list-actions">
+              <button class="btn-sm secondary" @click="editingListId = null">Cancelar</button>
+              <button class="btn-sm primary" :disabled="!editingName.trim()" @click="saveListEdit">Guardar</button>
+            </div>
+          </li>
+          <!-- Normal mode -->
+          <li
+            v-else
+            class="list-item"
+            :class="{ active: selectedList?.id === l.id }"
+            @click="selectList(l)"
+          >
+            <span class="list-dot" :style="{ background: l.color || '#6366f1' }"></span>
+            <span class="list-name">{{ l.name }}</span>
+            <span v-if="l.pendingCount" class="list-count">{{ l.pendingCount }}</span>
+            <button class="edit-list-btn" @click.stop="startEditList(l)" title="Editar lista">
+              <Pencil :size="11" />
+            </button>
+            <button class="del-list-btn" @click.stop="confirmDeleteList(l)" title="Eliminar lista">
+              <X :size="12" />
+            </button>
+          </li>
+        </template>
       </ul>
 
       <p v-if="!store.lists.length" class="lists-empty">
@@ -68,6 +91,16 @@
             <span class="list-dot-lg" :style="{ background: selectedList.color || '#6366f1' }"></span>
             <h2>{{ selectedList.name }}</h2>
             <span class="task-count">{{ pendingCount }}/{{ tasks.length }}</span>
+            <button
+              v-if="tasks.length"
+              class="clear-done-btn"
+              :disabled="!tasks.some(t => t.completed)"
+              title="Eliminar tareas completadas"
+              @click="clearCompleted"
+            >
+              <CheckCheck :size="13" />
+              Limpiar
+            </button>
           </div>
         </div>
 
@@ -128,7 +161,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { Plus, X, Check, ClipboardList, CalendarClock } from 'lucide-vue-next'
+import { Plus, X, Check, ClipboardList, CalendarClock, CheckCheck, Pencil } from 'lucide-vue-next'
 import { useTasksStore } from '@/stores/tasks'
 import { useConfirm } from '@/composables/useConfirm'
 import { useToast } from '@/composables/useToast'
@@ -141,6 +174,9 @@ const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#10b981', '#f59e0b', '#ef4444'
 
 const selectedList = ref(null)
 const mobileTab = ref('lists')
+const editingListId = ref(null)
+const editingName = ref('')
+const editingColor = ref(COLORS[0])
 
 onMounted(() => {
   // If lists already loaded (navigating from another page), select first immediately
@@ -222,12 +258,32 @@ function selectList(list) {
   mobileTab.value = 'tasks'
 }
 
+function startEditList(list) {
+  editingListId.value = list.id
+  editingName.value = list.name
+  editingColor.value = list.color || COLORS[0]
+}
+
+async function saveListEdit() {
+  if (!editingName.value.trim()) return
+  await store.updateList(editingListId.value, {
+    name: editingName.value.trim(),
+    color: editingColor.value,
+  })
+  editingListId.value = null
+}
+
 async function confirmDeleteList(list) {
   const ok = await confirm(`Eliminar lista "${list.name}"? Se pierden todas sus tareas.`, { danger: true })
   if (!ok) return
   if (selectedList.value?.id === list.id) selectedList.value = null
   await store.deleteList(list.id)
   toast.success('Lista eliminada')
+}
+
+async function clearCompleted() {
+  await store.clearCompletedTasks(selectedList.value.id)
+  toast.success('Tareas completadas eliminadas')
 }
 
 async function toggle(t) {
@@ -412,6 +468,42 @@ async function submitTask() {
   text-overflow: ellipsis;
 }
 
+.list-edit-form {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: color-mix(in srgb, var(--color-brand) 5%, var(--color-bg-sidebar));
+}
+
+.edit-list-input {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-brand);
+  border-radius: 7px;
+  color: var(--color-text-primary);
+  padding: 7px 10px;
+  font-size: 0.8rem;
+  font-family: inherit;
+  outline: none;
+  width: 100%;
+}
+
+.edit-list-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  flex-shrink: 0;
+  transition: color 0.15s;
+  opacity: 0;
+}
+
+.list-item:hover .edit-list-btn { opacity: 0.5; }
+.edit-list-btn:hover { color: var(--color-brand-light); opacity: 1 !important; }
+
 .del-list-btn {
   background: transparent;
   border: none;
@@ -425,6 +517,11 @@ async function submitTask() {
 }
 
 .del-list-btn:hover { color: var(--color-rejected); opacity: 1; }
+
+@media (hover: none) {
+  .edit-list-btn { opacity: 0.4; }
+  .del-list-btn { opacity: 0.4; }
+}
 
 .lists-empty {
   font-size: 0.78rem;
@@ -478,6 +575,33 @@ async function submitTask() {
   color: var(--color-text-primary);
   margin: 0;
   letter-spacing: -0.02em;
+}
+
+.clear-done-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 4px 10px;
+  border-radius: 7px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.clear-done-btn:hover:not(:disabled) {
+  border-color: var(--color-active);
+  color: var(--color-active);
+}
+
+.clear-done-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .task-count {
