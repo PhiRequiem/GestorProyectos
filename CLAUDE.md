@@ -65,7 +65,7 @@ AppLayout        — wraps all authenticated views; renders Sidebar + BottomNav
 ### Project status lifecycle
 
 `active` → `waitingClose: true` (pending closure) → `status: archived` → optionally reactivated.
-`status: unapproved` — proposals that were rejected (shown in Archive, not Dashboard).
+`status: not_approved` — proposals that were rejected (shown in Archive, not Dashboard).
 
 ### Financial model
 

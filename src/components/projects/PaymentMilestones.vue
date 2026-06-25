@@ -102,15 +102,15 @@ async function move(index, direction) {
   const list = sortedMilestones.value
   const targetIndex = index + direction
   if (targetIndex < 0 || targetIndex >= list.length) return
-  // Assign explicit orders to all items using their current position, then swap
-  const orders = list.map((m, i) => ({ id: m.id, order: m.order ?? i }))
-  const tmp = orders[index].order
-  orders[index].order = orders[targetIndex].order
-  orders[targetIndex].order = tmp
+  // Swap, then renormalize order to contiguous positions (0..n-1) so mixed/legacy
+  // data (order vs createdAt fallback) can't desync. Only write the ones that changed.
+  const reordered = [...list]
+  ;[reordered[index], reordered[targetIndex]] = [reordered[targetIndex], reordered[index]]
   await Promise.all(
-    orders
-      .filter((u, i) => u.order !== (list[i].order ?? i))
-      .map((u) => store.updateMilestone(props.projectId, u.id, { order: u.order }))
+    reordered
+      .map((m, i) => ({ id: m.id, newOrder: i, oldOrder: m.order }))
+      .filter((u) => u.newOrder !== u.oldOrder)
+      .map((u) => store.updateMilestone(props.projectId, u.id, { order: u.newOrder }))
   )
 }
 
@@ -126,11 +126,14 @@ async function remove(id) {
 
 async function addNew() {
   if (!newLabel.value.trim()) return
+  // Place new milestone after every existing one, using the same effective-order
+  // key as sortedMilestones so it lands last even on legacy (orderless) data.
+  const maxOrder = Math.max(-1, ...milestones.value.map((m) => m.order ?? m.createdAt?.seconds ?? 0))
   await store.addMilestone(props.projectId, {
     label: newLabel.value.trim(),
     amount: newAmount.value || 0,
     isExtra: newIsExtra.value,
-    order: milestones.value.length,
+    order: maxOrder + 1,
   })
   if (newIsExtra.value && newAmount.value > 0) {
     await store.updateProject(props.projectId, {
