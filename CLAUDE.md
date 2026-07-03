@@ -67,6 +67,12 @@ AppLayout        — wraps all authenticated views; renders Sidebar + BottomNav
 `active` → `waitingClose: true` (pending closure) → `status: archived` → optionally reactivated.
 `status: not_approved` — proposals that were rejected (shown in Archive, not Dashboard).
 
+### Grant applications
+
+A grant application is a project with `isGrant: true` — not a separate collection. It reuses the full project lifecycle, milestones, todos, notes and `deliveryDate` (as deadline), plus two grant-only fields: `grantUrl` (call URL) and `funder` (granting body). Set/cleared in `ProjectModal.vue`; persisted via the usual `createProject`/`updateProject` spread (no store changes).
+
+Grants are tracked **separately from client billing**: `billableActive` in `DashboardView.vue` excludes `isGrant`, so grant amounts never enter revenue/collected/pending totals. The Dashboard shows them via a dedicated amber "Grant" tag, a `grantOnly` filter toggle (works across all status tabs), and a `liveGrants` finance line (total applied + count). CSV export includes Grant / URL / Organismo columns.
+
 ### Financial model
 
 `totalAmount` = sum of all milestones (including `isExtra: true` ones). `milestonesCollected` = sum of paid milestones. "Extra charges" (`isExtra: true` milestones) add to the project total. Milestone amounts must not exceed total unless they are extras.

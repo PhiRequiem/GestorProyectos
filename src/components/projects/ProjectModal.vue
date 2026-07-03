@@ -37,10 +37,32 @@
               </div>
             </div>
 
+            <!-- Postulación a grant (independiente: conserva el monto) -->
+            <div class="col-span-2 grant-toggle">
+              <div class="toggle-row grant-row" :class="{ active: form.isGrant }" @click="form.isGrant = !form.isGrant">
+                <input type="checkbox" :checked="form.isGrant" class="toggle-radio" @click.stop />
+                <Landmark :size="13" class="toggle-icon amber" />
+                <span class="toggle-label">Postulación a Grant</span>
+                <span class="toggle-hint">Convocatoria / financiamiento</span>
+              </div>
+            </div>
+
+            <!-- Campos específicos de grant -->
+            <template v-if="form.isGrant">
+              <div class="form-group col-span-2">
+                <label>URL de la convocatoria</label>
+                <input v-model="form.grantUrl" type="url" placeholder="https://..." />
+              </div>
+              <div class="form-group col-span-2">
+                <label>Organismo / Fundación</label>
+                <input v-model="form.funder" type="text" placeholder="ej. CONACYT, NSF, Fundación XYZ" />
+              </div>
+            </template>
+
             <!-- Precio -->
             <div class="col-span-2 price-section" :class="{ dimmed: form.probono || form.isPersonal }">
               <div class="price-header">
-                <label>Monto acordado ($)</label>
+                <label>{{ form.isGrant ? 'Monto del grant ($)' : 'Monto acordado ($)' }}</label>
                 <div class="undefined-toggle" @click="form.priceUndefined = !form.priceUndefined">
                   <input type="checkbox" v-model="form.priceUndefined" @click.stop />
                   <span>Por definir</span>
@@ -63,7 +85,7 @@
 
             <div class="form-group">
               <label>
-                Fecha de Entrega
+                {{ form.isGrant ? 'Deadline' : 'Fecha de Entrega' }}
                 <span v-if="form.status === 'pending'" class="optional-tag">opcional en pendientes</span>
               </label>
               <input v-model="form.deliveryDate" type="date" />
@@ -129,7 +151,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { X, Loader2, Plus, Heart, User } from 'lucide-vue-next'
+import { X, Loader2, Plus, Heart, User, Landmark } from 'lucide-vue-next'
 import { useProjectsStore } from '@/stores/projects'
 import { useSettingsStore } from '@/stores/settings'
 import { useToast } from '@/composables/useToast'
@@ -163,6 +185,9 @@ const form = ref({
   client: props.project?.client || '',
   probono: props.project?.probono || false,
   isPersonal: props.project?.isPersonal || false,
+  isGrant: props.project?.isGrant || false,
+  grantUrl: props.project?.grantUrl || '',
+  funder: props.project?.funder || '',
   priceUndefined: props.project?.priceUndefined || false,
   totalAmount: props.project?.totalAmount || 0,
   startDate: toDateInput(props.project?.startDate),
@@ -217,6 +242,8 @@ async function handleSubmit() {
     advanceAmount: 0,
     startDate: form.value.startDate || null,
     deliveryDate: form.value.deliveryDate || null,
+    grantUrl: form.value.isGrant ? (form.value.grantUrl || '') : '',
+    funder: form.value.isGrant ? (form.value.funder || '') : '',
   }
   try {
     if (isEdit.value) {
@@ -404,6 +431,16 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .toggle-icon { flex-shrink: 0; }
 .toggle-icon.pink { color: #ec4899; }
 .toggle-icon.purple { color: var(--color-accent); }
+.toggle-icon.amber { color: #f59e0b; }
+
+/* Grant toggle (full width, independent of no-pay kinds) */
+.grant-toggle { display: flex; }
+.grant-row { flex: 1; }
+.grant-row.active {
+  border-color: color-mix(in srgb, #f59e0b 40%, transparent) !important;
+  background: color-mix(in srgb, #f59e0b 6%, var(--color-bg-elevated)) !important;
+}
+.grant-row .toggle-radio { accent-color: #f59e0b; }
 
 .toggle-label {
   font-size: 0.8rem;
@@ -648,5 +685,20 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+@media (max-width: 600px) {
+  .modal-backdrop { padding: 0; align-items: flex-end; }
+  .modal {
+    max-width: 100%;
+    max-height: 92vh;
+    border-radius: 16px 16px 0 0;
+  }
+  .modal-header { padding: 16px 18px; }
+  .modal-body { padding: 18px; }
+  .form-grid { grid-template-columns: 1fr; gap: 14px; }
+  .type-toggles { flex-direction: column; }
+  .modal-footer { position: sticky; bottom: 0; }
+  .btn-primary, .btn-secondary { flex: 1; justify-content: center; }
 }
 </style>

@@ -91,9 +91,10 @@ firebase deploy --only firestore:rules               # Solo reglas
 - Tabla de proyectos con ordenamiento por cualquier columna
 - **Búsqueda global** — busca en todos los estados simultáneamente
 - **Filtro por cliente** — clic en un nombre de cliente para ver solo sus proyectos
-- Tabs: Activos / En espera / No aprobado
-- Barra financiera: total cobrado vs pendiente de proyectos activos
-- Export a CSV
+- Tabs: Activos / Pend. cierre / En espera / No aprobado
+- **Filtro "Grants"** — muestra solo las postulaciones a grants, sobre cualquier estado
+- Barra financiera: total cobrado vs pendiente de proyectos activos, más una línea propia de **Grants** (monto postulado + nº de postulaciones), separada de la facturación de clientes
+- Export a CSV (incluye columnas Grant / URL / Organismo)
 - Indicadores de contenido en cada fila (tareas, notas, archivos)
 - Panel lateral (drawer) con acceso rápido a tareas, notas y archivos sin salir del dashboard
 
@@ -106,6 +107,13 @@ Cada proyecto gestiona:
 - **Estado:** Activo → Pendiente de cierre → Cerrar proyecto → Archivado
 - **Contenido:** notas editables, todos con edición inline, documentos con soporte de URL y rutas locales
 - **Indicador "Pend. cierre"** — marca el trabajo como terminado sin archivar (pendiente de revisión o pago)
+
+### Postulaciones a grants
+Un grant es un proyecto marcado como **Postulación a Grant** (`isGrant`): reutiliza todo el ciclo de estados, hitos, tareas, notas y deadline de un proyecto normal, con campos propios:
+- **URL de la convocatoria** (`grantUrl`) — enlace directo, clicable desde el detalle y el drawer
+- **Organismo / Fundación** (`funder`) — quién otorga el grant
+- El **monto** se interpreta como el monto del grant y la **fecha de entrega** como deadline
+- Se rastrean **aparte** de la facturación de clientes (filtro y línea financiera dedicados en el Dashboard) y son distinguibles por un tag ámbar "Grant"
 
 ### Archivo histórico
 - Proyectos cerrados y propuestas no aprobadas
@@ -137,6 +145,7 @@ projects/{projectId}
   title, client, status, priority, serviceType
   totalAmount, milestonesCollected
   probono, isPersonal, priceUndefined, waitingClose
+  isGrant, grantUrl, funder          — postulaciones a grants
   startDate, deliveryDate, closedAt
   notes, todosCount, docsCount, ownerId
   createdAt, updatedAt

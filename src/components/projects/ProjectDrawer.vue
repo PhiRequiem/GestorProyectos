@@ -4,9 +4,16 @@
       <div class="drawer">
         <div class="drawer-header">
           <div class="drawer-title">
-            <StatusBadge :status="project.status" />
+            <div class="drawer-badges">
+              <StatusBadge :status="project.status" />
+              <span v-if="project.isGrant" class="grant-tag"><Landmark :size="10" /> Grant</span>
+            </div>
             <h3>{{ project.title }}</h3>
-            <p class="client">{{ project.client }}</p>
+            <p v-if="project.client" class="client">{{ project.client }}</p>
+            <p v-if="project.isGrant && project.funder" class="client"><Landmark :size="12" /> {{ project.funder }}</p>
+            <a v-if="project.isGrant && project.grantUrl" :href="project.grantUrl" target="_blank" rel="noopener" class="grant-link">
+              <ExternalLink :size="12" /> Ver convocatoria
+            </a>
           </div>
           <div class="drawer-header-actions">
             <button
@@ -86,7 +93,7 @@
 <script setup>
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import { X, ExternalLink, ListTodo, FileText, FolderOpen, CheckCircle2, Pencil, Archive, Hourglass } from 'lucide-vue-next'
+import { X, ExternalLink, ListTodo, FileText, FolderOpen, CheckCircle2, Pencil, Archive, Hourglass, Landmark } from 'lucide-vue-next'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
 import TodoList from '@/components/projects/TodoList.vue'
 import DocumentsSection from '@/components/projects/DocumentsSection.vue'
@@ -183,6 +190,8 @@ async function toggleWaitingClose() {
 @media (max-width: 767px) {
   .drawer { width: 100%; border-left: none; }
   .drawer-backdrop { background: var(--color-bg-base); }
+  .drawer-header { flex-direction: column; }
+  .drawer-header-actions { width: 100%; flex-wrap: wrap; justify-content: flex-end; }
 }
 
 @keyframes slideIn {
@@ -199,18 +208,61 @@ async function toggleWaitingClose() {
   gap: 12px;
 }
 
+.drawer-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.drawer-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.grant-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #f59e0b;
+  background: color-mix(in srgb, #f59e0b 12%, transparent);
+  padding: 1px 6px;
+  border-radius: 99px;
+}
+
 .drawer-title h3 {
   font-size: 0.95rem;
   font-weight: 700;
   color: var(--color-text-primary);
   margin: 6px 0 2px;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .client {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   font-size: 0.78rem;
   color: var(--color-text-secondary);
   margin: 0;
 }
+
+.grant-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #f59e0b;
+  text-decoration: none;
+  margin-top: 4px;
+  transition: opacity 0.15s;
+}
+
+.grant-link:hover { opacity: 0.75; text-decoration: underline; }
 
 .drawer-header-actions {
   display: flex;

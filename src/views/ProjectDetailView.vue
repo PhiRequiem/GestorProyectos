@@ -16,9 +16,14 @@
           <ServiceBadge :service="project.serviceType || 'other'" />
           <span v-if="project.probono" class="kind-badge probono-badge"><Heart :size="11" /> Pro Bono</span>
           <span v-if="project.isPersonal" class="kind-badge personal-badge">φ</span>
+          <span v-if="project.isGrant" class="kind-badge grant-badge"><Landmark :size="11" /> Grant</span>
         </div>
         <h1>{{ project.title }}</h1>
-        <p class="client-name"><Building2 :size="14" /> {{ project.client }}</p>
+        <p v-if="project.client" class="client-name"><Building2 :size="14" /> {{ project.client }}</p>
+        <p v-if="project.isGrant && project.funder" class="client-name"><Landmark :size="14" /> {{ project.funder }}</p>
+        <a v-if="project.isGrant && project.grantUrl" :href="project.grantUrl" target="_blank" rel="noopener" class="grant-link">
+          <ExternalLink :size="14" /> Ver convocatoria
+        </a>
       </div>
       <div class="header-actions">
         <button class="btn-outline" @click="showModal = true">
@@ -180,6 +185,7 @@ import { storeToRefs } from 'pinia'
 import {
   ChevronRight, Building2, Pencil, Archive, RefreshCw, Clock,
   DollarSign, FileText, Check, Loader2, CheckCheck, Heart, Hourglass, Trash2,
+  Landmark, ExternalLink,
 } from 'lucide-vue-next'
 import { useProjectsStore } from '@/stores/projects'
 import StatusBadge from '@/components/ui/StatusBadge.vue'
@@ -411,6 +417,26 @@ async function saveNotes() {
   font-family: Georgia, serif;
 }
 
+.grant-badge {
+  background: color-mix(in srgb, #f59e0b 12%, transparent);
+  color: #f59e0b;
+  border: 1px solid color-mix(in srgb, #f59e0b 30%, transparent);
+}
+
+.grant-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #f59e0b;
+  text-decoration: none;
+  margin-top: 6px;
+  transition: opacity 0.15s;
+}
+
+.grant-link:hover { opacity: 0.75; text-decoration: underline; }
+
 .detail-header h1 {
   font-size: 1.8rem;
   font-weight: 800;
@@ -546,7 +572,7 @@ async function saveNotes() {
 
 .detail-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 16px;
 }
 
@@ -555,6 +581,7 @@ async function saveNotes() {
   border: 1px solid var(--color-border);
   border-radius: 14px;
   padding: 20px;
+  min-width: 0;
   transition: border-color 0.15s;
 }
 
@@ -755,8 +782,9 @@ async function saveNotes() {
 }
 
 @media (max-width: 767px) {
-  .detail-page { padding: 16px; }
-  .detail-grid { grid-template-columns: 1fr; }
+  .detail-page { padding: 16px; overflow-x: hidden; }
+  .detail-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .card { padding: 16px; }
   .detail-header { flex-direction: column; gap: 12px; }
   .header-actions { display: flex; flex-wrap: wrap; gap: 6px; }
   .detail-header h1 { font-size: 1.3rem; }

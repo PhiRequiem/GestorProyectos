@@ -65,6 +65,13 @@
         <span class="fi-label">Pro bono</span>
         <span class="fi-value probono">{{ probonoCount }} proyecto{{ probonoCount !== 1 ? 's' : '' }}</span>
       </div>
+      <template v-if="grantsCount">
+        <div class="fi-sep"></div>
+        <div class="finance-item">
+          <span class="fi-label"><Landmark :size="11" /> Grants</span>
+          <span class="fi-value grants">${{ grantsTotal.toLocaleString() }} · {{ grantsCount }} postulación{{ grantsCount !== 1 ? 'es' : '' }}</span>
+        </div>
+      </template>
       <div class="fi-progress">
         <div class="fi-bar" :style="{ width: collectedPct + '%' }"></div>
       </div>
@@ -79,6 +86,14 @@
             <Search :size="14" class="search-icon" />
             <input v-model="search" class="search-input" placeholder="Buscar proyecto o cliente..." />
           </div>
+          <button
+            class="grant-filter-btn"
+            :class="{ active: grantOnly }"
+            title="Mostrar solo postulaciones a grants"
+            @click="grantOnly = !grantOnly"
+          >
+            <Landmark :size="14" /> Grants
+          </button>
         <div class="filter-tabs">
           <button
             v-for="tab in tabs"
@@ -134,6 +149,7 @@
                 <span v-if="p.waitingClose" class="waiting-badge"><Hourglass :size="10" /> Pend. cierre</span>
                 <span v-if="p.probono" class="probono-tag"><Heart :size="10" /></span>
                 <span v-if="p.isPersonal" class="personal-tag">φ</span>
+                <span v-if="p.isGrant" class="grant-tag"><Landmark :size="10" /> Grant</span>
               </div>
             </div>
             <p class="mc-title">{{ p.title }}</p>
@@ -151,6 +167,7 @@
         </div>
 
         <!-- Desktop table -->
+        <div class="table-scroll">
         <table class="projects-table">
         <thead>
           <tr>
@@ -190,6 +207,7 @@
                 <Heart :size="10" />
               </span>
               <span v-if="p.isPersonal" class="personal-tag">φ</span>
+              <span v-if="p.isGrant" class="grant-tag"><Landmark :size="10" /> Grant</span>
               <span class="content-indicators">
                 <ListTodo v-if="p.todosCount > 0" :size="12" class="ind-icon" title="Tiene tareas" />
                 <FileText v-if="p.notes?.trim()" :size="12" class="ind-icon" title="Tiene notas" />
@@ -227,6 +245,7 @@
           </tr>
         </tbody>
       </table>
+      </div>
       </template>
     </div>
 
@@ -254,7 +273,7 @@ import {
   Plus, Briefcase, Clock, DollarSign, AlertTriangle,
   LayoutList, FolderOpen, Loader2,
   ArrowUp, ArrowDown, ArrowUpDown, Heart, Search, X, User,
-  ListTodo, FileText, Hourglass, Download,
+  ListTodo, FileText, Hourglass, Download, Landmark,
 } from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { useProjectsStore } from '@/stores/projects'
@@ -284,6 +303,7 @@ const drawerProject = computed(() =>
 const activeTab = ref('active')
 const search = ref('')
 const clientFilter = ref('')
+const grantOnly = ref(false)
 
 // Inline sort icon component
 const SortIcon = (props) => {
@@ -320,12 +340,17 @@ const greeting = computed(() => {
 const activeProjects = computed(() => projects.value.filter((p) => p.status === 'active'))
 const pendingProjects = computed(() => projects.value.filter((p) => p.status === 'pending'))
 
-const billableActive = computed(() => activeProjects.value.filter((p) => !p.probono && !p.isPersonal))
+const billableActive = computed(() => activeProjects.value.filter((p) => !p.probono && !p.isPersonal && !p.isGrant))
 const totalRevenue   = computed(() => billableActive.value.reduce((sum, p) => sum + (p.totalAmount || 0), 0))
 const totalCollected = computed(() => billableActive.value.reduce((sum, p) =>
   sum + (p.advanceAmount || 0) + (p.milestonesCollected || 0), 0))
 const totalPending   = computed(() => Math.max(0, totalRevenue.value - totalCollected.value))
 const probonoCount   = computed(() => activeProjects.value.filter((p) => p.probono).length)
+
+// Grants (postulaciones en curso): se rastrean aparte de la facturación de clientes
+const liveGrants   = computed(() => projects.value.filter((p) => p.isGrant && (p.status === 'active' || p.status === 'pending')))
+const grantsCount  = computed(() => liveGrants.value.length)
+const grantsTotal  = computed(() => liveGrants.value.reduce((sum, p) => sum + (p.totalAmount || 0), 0))
 const collectedPct   = computed(() =>
   totalRevenue.value ? Math.round((totalCollected.value / totalRevenue.value) * 100) : 0
 )
@@ -387,6 +412,10 @@ const filteredProjects = computed(() => {
 
   if (clientFilter.value) {
     list = list.filter((p) => p.client === clientFilter.value)
+  }
+
+  if (grantOnly.value) {
+    list = list.filter((p) => p.isGrant)
   }
 
   if (sortKey.value) {
@@ -463,7 +492,7 @@ function exportCSV() {
     return d.toLocaleDateString('es')
   }
   const rows = [
-    ['Titulo', 'Cliente', 'Estado', 'Prioridad', 'Servicio', 'Monto', 'Cobrado', 'Pendiente', 'Inicio', 'Entrega', 'Pro Bono', 'Personal'],
+    ['Titulo', 'Cliente', 'Estado', 'Prioridad', 'Servicio', 'Monto', 'Cobrado', 'Pendiente', 'Inicio', 'Entrega', 'Pro Bono', 'Personal', 'Grant', 'URL grant', 'Organismo'],
     ...projects.value.map((p) => [
       p.title,
       p.client,
@@ -477,6 +506,9 @@ function exportCSV() {
       fmt(p.deliveryDate),
       p.probono ? 'Si' : '',
       p.isPersonal ? 'Si' : '',
+      p.isGrant ? 'Si' : '',
+      p.isGrant ? (p.grantUrl ?? '') : '',
+      p.isGrant ? (p.funder ?? '') : '',
     ]),
   ]
   const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
@@ -655,6 +687,9 @@ async function archiveProject(p) {
 }
 
 .fi-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   font-size: 0.7rem;
   font-weight: 600;
   color: var(--color-text-muted);
@@ -671,6 +706,7 @@ async function archiveProject(p) {
 .fi-value.collected { color: var(--color-active); }
 .fi-value.pending   { color: var(--color-pending); }
 .fi-value.probono   { color: #ec4899; font-size: 0.95rem; }
+.fi-value.grants    { color: #f59e0b; font-size: 0.95rem; }
 
 .fi-progress {
   position: absolute;
@@ -691,6 +727,7 @@ async function archiveProject(p) {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .search-wrap {
@@ -751,7 +788,7 @@ async function archiveProject(p) {
   margin: 0;
 }
 
-.filter-tabs { display: flex; gap: 4px; }
+.filter-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
 
 .tab-btn {
   display: flex;
@@ -815,8 +852,14 @@ async function archiveProject(p) {
   font-family: inherit;
 }
 
+.table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .projects-table {
   width: 100%;
+  min-width: 720px;
   border-collapse: collapse;
 }
 
@@ -944,6 +987,46 @@ th.sortable:hover { color: var(--color-text-secondary); }
   color: #ec4899;
 }
 
+.grant-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #f59e0b;
+  background: color-mix(in srgb, #f59e0b 12%, transparent);
+  padding: 1px 6px;
+  border-radius: 99px;
+}
+
+.grant-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.grant-filter-btn:hover {
+  border-color: color-mix(in srgb, #f59e0b 50%, transparent);
+  color: #f59e0b;
+}
+
+.grant-filter-btn.active {
+  border-color: color-mix(in srgb, #f59e0b 50%, transparent);
+  background: color-mix(in srgb, #f59e0b 12%, transparent);
+  color: #f59e0b;
+}
+
 .client-link {
   cursor: pointer;
   border-radius: 4px;
@@ -1069,7 +1152,7 @@ th.sortable:hover { color: var(--color-text-secondary); }
   .search-input:focus { width: 100%; }
 
   .mobile-cards { display: flex; flex-direction: column; gap: 0; }
-  .projects-table { display: none; }
+  .table-scroll { display: none; }
 }
 
 .mobile-card {
